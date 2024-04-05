@@ -1,0 +1,203 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+name:  PR pipeline
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Don't mess with line endings
+      run: |
+        git config --global core.autocrlf false
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ubuntu-latest-3.9-pip-${{ hashFiles('setup.cfg') }}
+        restore-keys: |
+          ubuntu-latest-3.9-pip-
+    - name: Install build tools
+      run: |
+        make develop
+    - name: Setup pre-commit
+      run: |
+        make pre-commit
+    - name: Install dependencies
+      run: |
+        make install
+    - name: Run md document formatting (mdformat)
+      run: |
+        make mdformat
+    - name: Run code formatting (yapf)
+      run: |
+        make code-format
+    - name: Run code linting (flake8)
+      run: |
+        make code-lint
+    - name: Run code typing check (mypy)
+      continue-on-error: true
+      run: |
+        make code-typing
+    - name: Validate website content (mkdocs)
+      run: |
+        make docs-validate
+    - name: Check if dirty (mkdocs)
+      run: |
+        make check-for-changes
+
+# This test simulates what it is like for a user to install trestle today.
+# Coverage cannot be calculated as part of
+  bdist:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Don't mess with line endings
+      run: |
+        git config --global core.autocrlf false
+    - name: Don't mess with line endings
+      run: |
+        git config --global core.autocrlf false
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ubuntu-latest-3.9-pip-${{ hashFiles('setup.cfg') }}
+        restore-keys: |
+          ubuntu-latest-3.9-pip-
+    - name: Install build tools
+      run: |
+        make develop
+    - name: Run binary tests
+      run: |
+        make test-bdist
+
+  test:
+    # This test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: [3.8, 3.9]
+        include:
+        - os: ubuntu-latest
+          path: ~/.cache/pip
+        - os: macos-latest
+          path: ~/Library/Caches/pip
+        - os: windows-latest
+          path: ~\AppData\Local\pip\Cache
+        # optional 3.7 test
+        - os: ubuntu-latest
+          path: ~/.cache/pip
+          python-version: 3.7
+        # optional 3.7 test
+        - os: macos-latest
+          path: ~/Library/Caches/pip
+          python-version: 3.7.16
+        # optional 3.7 test
+        - os: windows-latest
+          path: ~\AppData\Local\pip\Cache
+          python-version: 3.7
+          
+    steps:
+    - name: Don't mess with line endings
+      run: |
+        git config --global core.autocrlf false
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        submodules: true
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: actions/cache@v2
+      with:
+        path: ${{ matrix.path }}
+        key: ${{ matrix.os }}-${{ matrix.python-version }}-pip-${{ hashFiles('setup.cfg') }}
+        restore-keys: |
+         ${{ matrix.os }}-${{ matrix.python-version }}-pip-
+    - name: Install build tools
+      run: |
+        make develop
+    - name: Pytest Fast
+      if: ${{ !(matrix.os == 'ubuntu-latest' && matrix.python-version == '3.8') }}
+      run: |
+        make test
+    - name: Pytest Cov
+      if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.8' }}
+      run: |
+        make test-cov
+
+    - name: Upload artifact
+      if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.8' }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: coverage
+        path: coverage.xml
+
+  sonar:
+    if: ${{ github.event.pull_request.base.repo.url == github.event.pull_request.head.repo.url }}
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Don't mess with line endings
+      run: |
+        git config --global core.autocrlf false
+    - name: Don't mess with line endings
+      run: |
+        git config --global core.autocrlf false
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ubuntu-latest-3.9-pip-${{ hashFiles('setup.cfg') }}
+        restore-keys: |
+          ubuntu-latest-3.9-pip-
+    - name: Install build tools
+      run: |
+        make develop
+    - name: Get coverage
+      uses: actions/download-artifact@v2
+      with:
+        name: coverage
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        args: >
+          -Dsonar.python.coverage.reportPaths=coverage.xml
+          -Dsonar.tests=tests/
+          -Dsonar.sources=trestle/ 
+          -Dsonar.python.version=3.8
+          -Dsonar.projectKey=compliance-trestle
+          -Dsonar.organization=compliance-trestle
+          -Dsonar.cpd.exclusions=trestle/oscal/*.py
+    - name: SonarQube Quality Gate check
+      uses: sonarsource/sonarqube-quality-gate-action@master
+      # Force to fail step after specific time
+      timeout-minutes: 5
+      env:
+       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
