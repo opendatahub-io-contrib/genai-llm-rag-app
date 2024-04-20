@@ -33,9 +33,6 @@ jobs:
     - name: Setup pre-commit
       run: |
         make pre-commit
-    - name: Install dependencies
-      run: |
-        make install
     - name: Run md document formatting (mdformat)
       run: |
         make mdformat

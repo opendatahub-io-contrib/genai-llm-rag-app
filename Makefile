@@ -30,6 +30,10 @@ code-lint:
 code-typing:
 	mypy --pretty trestle
 
+mdformat:
+	pre-commit run mdformat --all-files
+
+
 pylint:
 	pylint example
 
