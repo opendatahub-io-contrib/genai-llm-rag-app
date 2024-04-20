@@ -27,11 +27,11 @@ code-format:
 code-lint:
 	pre-commit run flake8 --all-files
 
+code-typing:
+	mypy --pretty trestle
+
 pylint:
 	pylint example
 
-pylint-test:
-	pylint tests --rcfile=.pylintrc_tests
-
-check-for-changes:
-	python scripts/have_files_changed.py -u
+develop:
+	pip install -r requirements.txt
