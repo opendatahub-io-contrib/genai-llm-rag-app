@@ -1,0 +1,7 @@
+# This file is a placeholder
+pre-commit
+yapf
+pylint
+pytest
+flake8
+mypy
