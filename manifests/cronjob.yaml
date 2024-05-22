@@ -1,0 +1,16 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: rag-generate-cronjob
+spec:
+  schedule: "*/5 * * * *"  # This sets the schedule to run every minute
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: rag-generate
+            image: avijra28/rag-generate-embed:7.0
+          restartPolicy: Never
+  backoffLimit: 0
+
