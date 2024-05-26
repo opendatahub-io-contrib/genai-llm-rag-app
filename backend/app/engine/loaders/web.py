@@ -1,24 +1,29 @@
-import os
-import json
+"""Web crawling tools to pull down documents."""
+from llama_index.readers.web import WholeSiteReader
+
 from pydantic import BaseModel, Field
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 
 class CrawlUrl(BaseModel):
+    """Define the crawl URL parameters."""
+
     base_url: str
     prefix: str
     max_depth: int = Field(default=1, ge=0)
 
 
 class WebLoaderConfig(BaseModel):
+    """Configuration for the web crawler including custom args."""
+
     driver_arguments: list[str] = Field(default=None)
     urls: list[CrawlUrl]
 
 
 def get_web_documents(config: WebLoaderConfig):
-    from llama_index.readers.web import WholeSiteReader
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-
+    """GET Documents from the web using selenium."""
     options = Options()
     driver_arguments = config.driver_arguments or []
     for arg in driver_arguments:

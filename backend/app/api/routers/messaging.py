@@ -1,27 +1,32 @@
+"""Messaging events handler."""
 import asyncio
-from typing import AsyncGenerator, Dict, Any, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from llama_index.core.callbacks.base import BaseCallbackHandler
 from llama_index.core.callbacks.schema import CBEventType
+
 from pydantic import BaseModel
 
 
 class CallbackEvent(BaseModel):
+    """Callback event model."""
+
     event_type: CBEventType
     payload: Optional[Dict[str, Any]] = None
-    event_id: str = ""
+    event_id: str = ''
 
     def get_title(self) -> str | None:
+        """Get event title and handle as a factory to the UI."""
         # Return as None for the unhandled event types
         # to avoid showing them in the UI
         match self.event_type:
-            case "retrieve":
+            case 'retrieve':
                 if self.payload:
-                    nodes = self.payload.get("nodes")
+                    nodes = self.payload.get('nodes')
                     if nodes:
-                        return f"Retrieved {len(nodes)} sources to use as context for the query"
+                        return f'Retrieved {len(nodes)} sources to use as context for the query'
                     else:
-                        return f"Retrieving context for query: '{self.payload.get('query_str')}'"
+                        return f'Retrieving context for query: "{self.payload.get("query_str")}"'
                 else:
                     return None
             case _:
@@ -29,12 +34,12 @@ class CallbackEvent(BaseModel):
 
 
 class EventCallbackHandler(BaseCallbackHandler):
+    """Event callback handler."""
+
     _aqueue: asyncio.Queue
     is_done: bool = False
 
-    def __init__(
-        self,
-    ):
+    def __init__(self):
         """Initialize the base callback handler."""
         ignored_events = [
             CBEventType.CHUNKING,
@@ -50,9 +55,10 @@ class EventCallbackHandler(BaseCallbackHandler):
         self,
         event_type: CBEventType,
         payload: Optional[Dict[str, Any]] = None,
-        event_id: str = "",
-        **kwargs: Any,
+        event_id: str = '',
+        **kwargs: Any
     ) -> str:
+        """Handle the event start."""
         event = CallbackEvent(event_id=event_id, event_type=event_type, payload=payload)
         if event.get_title() is not None:
             self._aqueue.put_nowait(event)
@@ -61,9 +67,10 @@ class EventCallbackHandler(BaseCallbackHandler):
         self,
         event_type: CBEventType,
         payload: Optional[Dict[str, Any]] = None,
-        event_id: str = "",
+        event_id: str = '',
         **kwargs: Any,
     ) -> None:
+        """Handle the event end."""
         event = CallbackEvent(event_id=event_id, event_type=event_type, payload=payload)
         if event.get_title() is not None:
             self._aqueue.put_nowait(event)
@@ -79,6 +86,7 @@ class EventCallbackHandler(BaseCallbackHandler):
         """No-op."""
 
     async def async_event_gen(self) -> AsyncGenerator[CallbackEvent, None]:
+        """Asyncroous events generator."""
         while not self._aqueue.empty() or not self.is_done:
             try:
                 yield await asyncio.wait_for(self._aqueue.get(), timeout=0.1)
